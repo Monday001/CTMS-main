@@ -1,12 +1,12 @@
 "use client";
-import { Inter } from "next/font/google";
+
 import Box from "@mui/material/Box";
 import { mainListItems } from "./listItems";
 import MuiAppBar, { AppBarProps as MuiAppBarProps } from "@mui/material/AppBar";
 import CssBaseline from "@mui/material/CssBaseline";
 import MuiDrawer from "@mui/material/Drawer";
 import { styled } from "@mui/material/styles";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Toolbar from "@mui/material/Toolbar";
 import List from "@mui/material/List";
 import Typography from "@mui/material/Typography";
@@ -14,12 +14,11 @@ import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import LogoutIcon from '@mui/icons-material/Logout';
+import LogoutIcon from "@mui/icons-material/Logout";
 import axios from "axios";
 import toast from "react-hot-toast";
-import {useRouter} from "next/navigation";
+import { useRouter } from "next/navigation";
 
-const inter = Inter({ subsets: ["latin"] });
 const drawerWidth: number = 240;
 
 interface AppBarProps extends MuiAppBarProps {
@@ -70,44 +69,47 @@ const Drawer = styled(MuiDrawer, {
   },
 }));
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// 🔹 Context for page titles
+const PageTitleContext = createContext<{
+  title: string;
+  setTitle: (t: string) => void;
+}>({
+  title: "Dashboard",
+  setTitle: () => {},
+});
+
+export const usePageTitle = () => useContext(PageTitleContext);
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
-  const router = useRouter()
-  
+  const [title, setTitle] = useState("Dashboard");
+  const router = useRouter();
+
   useEffect(() => {
     setOpen((prevOpen) => !prevOpen);
   }, []);
 
-  const toggleDrawer = () => {
-    setOpen((prevOpen) => !prevOpen);
-  };
+  const toggleDrawer = () => setOpen((prevOpen) => !prevOpen);
+
   const logout = async () => {
     try {
-      await axios.get('/api/users/logout')
-      toast.success('Logout successful')
-      router.push('/login')
+      await axios.get("/api/users/logout");
+      toast.success("Logout successful");
+      router.push("/login");
     } catch (error: any) {
       console.log(error.message);
-      toast.error(error.message)
+      toast.error(error.message);
     }
-  }
+  };
 
   return (
-    
-    <>
-      <body className={`inter.className flex mx-auto w-full bg-white`}>
-        <Box sx={{ display: "flex" }}>
+    <PageTitleContext.Provider value={{ title, setTitle }}>
+      {/* ✅ No poppins.className needed here, font comes from body */}
+      <div className="flex mx-auto w-full bg-white">
+        <Box sx={{ display: "flex", width: "100%" }}>
           <CssBaseline />
           <AppBar position="absolute" open={open}>
-            <Toolbar
-              sx={{
-                pr: "24px", // keep right padding when drawer closed
-              }}
-            >
+            <Toolbar sx={{ pr: "24px" }}>
               <IconButton
                 edge="start"
                 color="inherit"
@@ -125,15 +127,13 @@ export default function AdminLayout({
                 variant="h6"
                 color="inherit"
                 noWrap
-                sx={{ flexGrow: 1 }}
+                sx={{ flexGrow: 1, fontWeight: "bold" }}
               >
-                Dashboard
+                {title}
               </Typography>
-              <IconButton color="inherit" onClick={logout} >
-              
-                <LogoutIcon  />
-              
-            </IconButton>
+              <IconButton color="inherit" onClick={logout}>
+                <LogoutIcon />
+              </IconButton>
             </Toolbar>
           </AppBar>
           <Drawer variant="permanent" open={open}>
@@ -153,7 +153,6 @@ export default function AdminLayout({
             <List component="nav">
               {mainListItems}
               <Divider sx={{ my: 1 }} />
-              {/* {secondaryListItems} */}
             </List>
           </Drawer>
           <Box
@@ -166,13 +165,14 @@ export default function AdminLayout({
               flexGrow: 1,
               height: "100vh",
               overflow: "auto",
+              p: 3,
             }}
           >
             <Toolbar />
+            {children}
           </Box>
         </Box>
-        {children}
-      </body>
-    </>
+      </div>
+    </PageTitleContext.Provider>
   );
 }

@@ -33,7 +33,7 @@ export default function LecturerCount() {
         </span>
       </button>
       <Typography component="p" variant="h4" sx={{ display: "flex", p: 1, ml: 4 }}>
-      <h1 className='font-semibold text-stone-700'>{lecturerCount}</h1> <div className='text-green-500 text-base font-light flex items-center font-poppins ml-4'> 70% <IoMdArrowDropup /></div>
+      <h1 className='font-semibold text-stone-700'>{lecturerCount}</h1>
       </Typography>
 
     </React.Fragment>
