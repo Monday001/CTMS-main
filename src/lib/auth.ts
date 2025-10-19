@@ -1,22 +1,27 @@
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 
-export function verifyToken() {
+export function verifyToken(request?: NextRequest) {
   try {
-    // 1. Read token from cookies
     const token = cookies().get("token")?.value;
     if (!token) {
       console.warn("❌ No token found in cookies");
-      return null;
+      if (request) {
+        const redirect = NextResponse.redirect(new URL("/login", request.url));
+        return { valid: false, response: redirect };
+      }
+      return { valid: false, user: null };
     }
 
-    // 2. Verify token
     const decoded = jwt.verify(token, process.env.JWT_TOKEN_SECRET!);
-
-    // 3. Return decoded user info (id, username, email, role)
-    return decoded;
+    return { valid: true, user: decoded };
   } catch (error) {
     console.error("❌ Invalid token:", error);
-    return null;
+    if (request) {
+      const redirect = NextResponse.redirect(new URL("/login", request.url));
+      return { valid: false, response: redirect };
+    }
+    return { valid: false, user: null };
   }
 }

@@ -1,273 +1,250 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/dbConfig/dbConfig";
-import jwt from "jsonwebtoken";
+import { verifyToken } from "@/lib/auth";
 
 /**
- * Helper: extract user data from JWT
- */
-async function getDataFromToken(request: NextRequest) {
-  const token = request.cookies.get("token")?.value || "";
-  if (!token) throw new Error("No token provided");
-
-  try {
-    const decoded: any = jwt.verify(token, process.env.JWT_TOKEN_SECRET!);
-    return decoded; // { id, username, email, role }
-  } catch {
-    throw new Error("Invalid or expired token");
-  }
-}
-
-/**
- * Fetch full user data from DB (joins student if exists)
+ * Fetch full user details including role, course, and year.
  */
 async function getFullUser(userId: number) {
   const [users]: any = await pool.query(
-    `SELECT u.id, u.username, u.role, s.course, s.yearOfStudy 
+    `SELECT 
+      u.id, u.firstname, u.lastname, u.email, u.role, 
+      s.course, s.yearOfStudy, s.registrationNumber
      FROM users u
-     LEFT JOIN student s ON u.id = s.userId
+     LEFT JOIN student s ON u.id = s.id 
      WHERE u.id = ? LIMIT 1`,
     [userId]
   );
   return users.length ? users[0] : null;
 }
 
-/**
- * Create a new notification
- */
-export async function POST(request: NextRequest) {
-  try {
-    const {
-      lecturer,
-      venue,
-      unit,
-      saa,
-      detail,
-      targetUserId,
-      targetCourse,
-      targetYear,
-    } = await request.json();
-
-    const [result]: any = await pool.query(
-      `INSERT INTO notification (lecturer, venue, unit, saa, detail, targetUserId, targetCourse, targetYear) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        lecturer,
-        venue,
-        unit,
-        saa,
-        detail,
-        targetUserId || null,
-        targetCourse || null,
-        targetYear || null,
-      ]
-    );
-
-    return NextResponse.json({
-      message: "Notification created successfully",
-      success: true,
-      notificationId: result.insertId,
-    });
-  } catch (error: any) {
-    console.error("POST Notification Error:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-/**
- * Fetch notifications for logged-in user
- */
+// ----------------------------------------------------------------------
+// --- GET (Fetch Notifications Per User or Sent Ones) ---
+// ----------------------------------------------------------------------
 export async function GET(request: NextRequest) {
+  const { valid, user, response } = verifyToken(request);
+  if (!valid) return response;
+
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get("type") || "system"; // "system" | "sent"
+
+  const fullUser = await getFullUser((user as any).id);
+  if (!fullUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
   try {
-    const currentUser = await getDataFromToken(request);
-    const user = await getFullUser(currentUser.id);
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    let query = `SELECT * FROM notification WHERE 1=0`;
+    let query = "";
     let params: any[] = [];
 
-    if (user.role === "STUDENT") {
+    // ------------------------------------------------------------------
+    // SYSTEM NOTIFICATIONS — ones RECEIVED by the logged-in user
+    // ------------------------------------------------------------------
+    if (type === "system") {
+      if (fullUser.role === "STUDENT") {
+        query = `
+          SELECT 
+            n.id,
+            n.title,
+            COALESCE(n.detail, n.message) AS message,
+            n.unit,
+            n.venue,
+            n.classTime,
+            n.createdAt,
+            u.firstname AS lecturer,
+            un.readStatus,
+            un.deleted
+          FROM notification n
+          LEFT JOIN user_notification un ON n.id = un.notificationId AND un.userId = ?
+          LEFT JOIN users u ON u.id = n.senderId
+          WHERE 
+            (
+              (n.targetType = 'USER' AND n.targetUserId = ?)
+              OR (n.targetType = 'COURSE' AND n.targetCourse = ? AND (n.targetYear = ? OR n.targetYear IS NULL))
+              OR n.targetType = 'ALL_STUDENTS'
+            )
+            AND (un.deleted IS NULL OR un.deleted = 0)
+          ORDER BY n.createdAt DESC
+        `;
+        params = [fullUser.id, fullUser.id, fullUser.course, fullUser.yearOfStudy];
+      } else if (fullUser.role === "LECTURER") {
+        query = `
+          SELECT 
+            n.id, 
+            n.title, 
+            COALESCE(n.detail, n.message) AS message,
+            n.createdAt, 
+            n.senderId, 
+            un.readStatus
+          FROM notification n
+          LEFT JOIN user_notification un ON n.id = un.notificationId AND un.userId = ?
+          WHERE 
+            (n.targetType = 'ALL_LECTURERS' OR (n.targetType = 'USER' AND n.targetUserId = ?))
+            AND (un.deleted IS NULL OR un.deleted = 0)
+          ORDER BY n.createdAt DESC
+        `;
+        params = [fullUser.id, fullUser.id];
+      } else if (fullUser.role === "ADMIN") {
+        query = `
+          SELECT 
+            n.id,
+            n.title,
+            COALESCE(n.detail, n.message) AS message,
+            n.createdAt,
+            un.readStatus
+          FROM notification n
+          LEFT JOIN user_notification un ON n.id = un.notificationId AND un.userId = ?
+          WHERE 
+            (n.targetType = 'ADMIN' OR n.targetType = 'ALL_ADMINS')
+            AND (un.deleted IS NULL OR un.deleted = 0)
+          ORDER BY n.createdAt DESC
+        `;
+        params = [fullUser.id];
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // SENT NOTIFICATIONS — ones AUTHORED by the logged-in user
+    // ------------------------------------------------------------------
+    else if (type === "sent") {
       query = `
-        SELECT * FROM notification 
-        WHERE targetUserId = ? 
-           OR (targetCourse = ? AND targetYear = ?) 
-           OR (targetCourse = ? AND targetYear IS NULL)
-        ORDER BY createdAt DESC
+        SELECT 
+          n.id,
+          n.title,
+          n.message,
+          n.targetType,
+          n.targetCourse,
+          n.targetYear,
+          n.createdAt
+        FROM notification n
+        WHERE n.senderId = ?
+        ORDER BY n.createdAt DESC
       `;
-      params = [user.id, user.course, user.yearOfStudy, user.course];
-    } else {
-      query = `
-        SELECT * FROM notification 
-        WHERE targetUserId = ? 
-        ORDER BY createdAt DESC
-      `;
-      params = [user.id];
+      params = [fullUser.id];
     }
 
     const [rows]: any = await pool.query(query, params);
     return NextResponse.json(rows);
-  } catch (error: any) {
-    console.error("GET Notification Error:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (err: any) {
+    console.error("❌ GET Error:", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
-/**
- * Update notification by ID (Admins can edit all, Lecturers only their own)
- */
-export async function PUT(request: NextRequest) {
+// ----------------------------------------------------------------------
+// --- POST (Create Notification + Initialize User Records) ---
+// ----------------------------------------------------------------------
+export async function POST(request: NextRequest) {
+  const { valid, user, response } = verifyToken(request);
+  if (!valid) return response;
+  const senderId = (user as any).id;
+
+  const fullUser = await getFullUser(senderId);
+  if (!fullUser) return NextResponse.json({ error: "Sender not found" }, { status: 404 });
+  if (fullUser.role === "STUDENT")
+    return NextResponse.json({ error: "Students cannot send notifications" }, { status: 403 });
+
   try {
+    const body = await request.json();
     const {
-      id,
-      lecturer,
-      venue,
-      unit,
-      saa,
-      detail,
-      targetUserId,
+      title,
+      message,
+      targetType,
       targetCourse,
       targetYear,
-    } = await request.json();
+      targetRegNo,
+      targetEmail,
+      venue,
+      unit,
+      detail,
+      classTime,
+    } = body;
 
-    if (!id) {
-      return NextResponse.json(
-        { error: "Notification ID is required" },
-        { status: 400 }
+    if (!title || !message || !targetType)
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+
+    let targetUserId = 0;
+    let finalTargetCourse = targetCourse || null;
+    let finalTargetYear = targetYear || null;
+
+    // Target a single student
+    if (targetType === "USER" && targetRegNo) {
+      const [studentResult]: any = await pool.query(
+        "SELECT id FROM student WHERE registrationNumber = ? LIMIT 1",
+        [targetRegNo]
       );
+      if (!studentResult.length)
+        return NextResponse.json({ error: `Student ${targetRegNo} not found.` }, { status: 404 });
+      targetUserId = studentResult[0].id;
     }
 
-    const currentUser = await getDataFromToken(request);
-    const user = await getFullUser(currentUser.id);
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    if (user.role === "STUDENT") {
-      return NextResponse.json(
-        { error: "Unauthorized: Students cannot edit notifications" },
-        { status: 403 }
+    // Target a single admin
+    else if (targetType === "ADMIN" && targetEmail) {
+      const [adminResult]: any = await pool.query(
+        "SELECT id FROM users WHERE email = ? AND role = 'ADMIN' LIMIT 1",
+        [targetEmail]
       );
+      if (!adminResult.length)
+        return NextResponse.json({ error: `Admin ${targetEmail} not found.` }, { status: 404 });
+      targetUserId = adminResult[0].id;
     }
 
-    const [rows]: any = await pool.query(
-      "SELECT * FROM notification WHERE id = ? LIMIT 1",
-      [id]
-    );
+    // Always ensure detail exists
+    const finalDetail = detail || message;
 
-    if (rows.length === 0) {
-      return NextResponse.json(
-        { error: "Notification not found" },
-        { status: 404 }
-      );
-    }
-
-    const notification = rows[0];
-
-    if (user.role === "LECTURER" && notification.lecturer !== user.username) {
-      return NextResponse.json(
-        { error: "Unauthorized: You can only edit your own notifications" },
-        { status: 403 }
-      );
-    }
-
-    const [result]: any = await pool.query(
-      `UPDATE notification 
-       SET lecturer = ?, venue = ?, unit = ?, saa = ?, detail = ?, targetUserId = ?, targetCourse = ?, targetYear = ?
-       WHERE id = ?`,
+    // Insert notification
+    const [insertResult]: any = await pool.query(
+      `INSERT INTO notification 
+        (senderId, title, message, targetType, targetUserId, targetCourse, targetYear, 
+         venue, unit, detail, classTime, readStatus) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
       [
-        lecturer,
-        venue,
-        unit,
-        saa,
-        detail,
-        targetUserId || null,
-        targetCourse || null,
-        targetYear || null,
-        id,
+        senderId,
+        title,
+        message,
+        targetType,
+        targetUserId,
+        finalTargetCourse,
+        finalTargetYear,
+        venue || null,
+        unit || null,
+        finalDetail,
+        classTime || null,
       ]
     );
 
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: "Update failed" }, { status: 500 });
-    }
+    const notificationId = insertResult.insertId;
 
-    return NextResponse.json(
-      { message: "Notification updated successfully" },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error("PUT Notification Error:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-/**
- * Delete notification by ID (Admins can delete all, Lecturers only their own)
- */
-export async function DELETE(request: NextRequest) {
-  try {
-    const id = request.nextUrl.searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json(
-        { error: "Notification ID is required" },
-        { status: 400 }
+    // Initialize user_notification for each targeted user
+    if (targetType === "COURSE" && finalTargetCourse) {
+      const [students]: any = await pool.query(
+        "SELECT id FROM student WHERE course = ? AND (yearOfStudy = ? OR ? IS NULL)",
+        [finalTargetCourse, finalTargetYear, finalTargetYear]
+      );
+      if (students.length) {
+        const values = students.map((s: any) => [notificationId, s.id]);
+        await pool.query(
+          "INSERT INTO user_notification (notificationId, userId) VALUES ?",
+          [values]
+        );
+      }
+    } else if (targetType === "ALL_STUDENTS") {
+      const [allStudents]: any = await pool.query("SELECT id FROM student");
+      if (allStudents.length) {
+        const values = allStudents.map((s: any) => [notificationId, s.id]);
+        await pool.query(
+          "INSERT INTO user_notification (notificationId, userId) VALUES ?",
+          [values]
+        );
+      }
+    } else if (targetType === "USER" && targetUserId) {
+      await pool.query(
+        "INSERT INTO user_notification (notificationId, userId) VALUES (?, ?)",
+        [notificationId, targetUserId]
       );
     }
 
-    const currentUser = await getDataFromToken(request);
-    const user = await getFullUser(currentUser.id);
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    if (user.role === "STUDENT") {
-      return NextResponse.json(
-        { error: "Unauthorized: Students cannot delete notifications" },
-        { status: 403 }
-      );
-    }
-
-    const [rows]: any = await pool.query(
-      "SELECT * FROM notification WHERE id = ? LIMIT 1",
-      [id]
-    );
-
-    if (rows.length === 0) {
-      return NextResponse.json(
-        { error: "Notification not found" },
-        { status: 404 }
-      );
-    }
-
-    const notification = rows[0];
-
-    if (user.role === "LECTURER" && notification.lecturer !== user.username) {
-      return NextResponse.json(
-        { error: "Unauthorized: You can only delete your own notifications" },
-        { status: 403 }
-      );
-    }
-
-    const [result]: any = await pool.query(
-      "DELETE FROM notification WHERE id = ?",
-      [id]
-    );
-
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: "Delete failed" }, { status: 500 });
-    }
-
-    return NextResponse.json(
-      { message: "Notification deleted successfully" },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error("DELETE Notification Error:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ message: "Notification sent successfully" });
+  } catch (err: any) {
+    console.error("❌ POST Error:", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

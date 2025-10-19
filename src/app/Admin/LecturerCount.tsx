@@ -2,6 +2,7 @@ import * as React from 'react';
 import { IoMdArrowDropup } from "react-icons/io";
 import Typography from '@mui/material/Typography';
 import { FaUserGroup } from "react-icons/fa6";
+import { FaChalkboardTeacher } from "react-icons/fa";
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 
@@ -27,7 +28,7 @@ export default function LecturerCount() {
   return (
     <React.Fragment>
       <button className="bg-none p-2 rounded-lg flex items-center">
-        <FaUserGroup className="relative text-lg ml-1 mr-1 text-stone-500" />
+        <FaChalkboardTeacher className="relative text-lg ml-1 mr-1 text-[#50765F]" />
         <span className=" ml-2 text-base">
         Lecturers
         </span>

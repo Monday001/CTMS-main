@@ -6,13 +6,14 @@ import Box from "@mui/material/Box";
 import Toolbar from "@mui/material/Toolbar";
 import Container from "@mui/material/Container";
 import Grid from "@mui/material/Grid";
-import Paper from "@mui/material/Paper";
 import ChartsOverviewDemo from "./Graph/page";
 import StudentCount from "./StudentCount";
 import TimetableCount from "./TimetableCount";
-import Aparol from "./Aparol";
+import Aparol from "./CourseCount";
 import LecturerCount from "./LecturerCount";
-import { usePageTitle } from "./layout"; 
+import CourseDistributionGraph from "./CourseDistributionGraph";
+import { usePageTitle } from "./layout";
+import CourseCount from "./CourseCount";
 
 const defaultTheme = createTheme();
 
@@ -20,7 +21,7 @@ export default function Dashboard() {
   const { setTitle } = usePageTitle();
 
   React.useEffect(() => {
-    setTitle("Dashboard"); 
+    setTitle("Dashboard");
   }, [setTitle]);
 
   return (
@@ -35,37 +36,42 @@ export default function Dashboard() {
                 ? theme.palette.grey[100]
                 : theme.palette.grey[900],
             flexGrow: 1,
-            height: "100vh",
-            overflow: "auto",
           }}
         >
           <Toolbar />
-          <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Container maxWidth="lg" sx={{ mt: 0, mb: 4 }}>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={4} lg={3}>
-                <Paper sx={{ p: 2, display: "flex", flexDirection: "column", height: 120 }}>
+              {/* ✅ Timetable Card (custom-styled) */}
+              <Grid item xs={12} md={6} lg={3}>
+                <div className="p-5 bg-[#D0DCD0] shadow rounded-xl items-center space-x-4 hover:shadow-md transition h-[120px]">
                   <TimetableCount />
-                </Paper>
+                </div>
               </Grid>
-              <Grid item xs={12} md={4} lg={3}>
-                <Paper sx={{ p: 2, display: "flex", flexDirection: "column", height: 120 }}>
+
+              {/* Lecturer */}
+              <Grid item xs={12} md={6} lg={3}>
+                <div className="p-5 bg-[#D0DCD0] shadow rounded-xl items-center space-x-4 hover:shadow-md transition h-[120px]">
                   <LecturerCount />
-                </Paper>
+                </div>
               </Grid>
-              <Grid item xs={12} md={4} lg={3}>
-                <Paper sx={{ p: 2, display: "flex", flexDirection: "column", height: 120 }}>
+
+              {/* Students */}
+              <Grid item xs={12} md={6} lg={3}>
+                <div className="p-5 bg-[#D0DCD0] shadow rounded-xl items-center space-x-4 hover:shadow-md transition h-[120px]">
                   <StudentCount />
-                </Paper>
+                </div>
               </Grid>
-              <Grid item xs={12} md={4} lg={3}>
-                <Paper sx={{ p: 2, display: "flex", flexDirection: "column", height: 120 }}>
-                  <Aparol />
-                </Paper>
+
+              {/* Courses */}
+              <Grid item xs={12} md={6} lg={3}>
+                <div className="p-5 bg-[#D0DCD0] shadow rounded-xl items-center space-x-4 hover:shadow-md transition h-[120px]">
+                  <CourseCount />
+                </div>
               </Grid>
+
+              {/* Chart */}
               <Grid item xs={12}>
-                <Paper sx={{ p: 2, display: "flex", flexDirection: "column", height: 400 }}>
-                  <ChartsOverviewDemo />
-                </Paper>
+                <CourseDistributionGraph />
               </Grid>
             </Grid>
           </Container>

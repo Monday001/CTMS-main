@@ -1,191 +1,488 @@
 "use client";
-import React, { useEffect } from 'react'
-import Header from '../Header/page'
-import axios from 'axios';
-import toast from 'react-hot-toast';
-import { FaUser } from 'react-icons/fa6';
-import { FaBuilding } from "react-icons/fa";
-import { MdClass } from "react-icons/md";
-import { IoIosTime } from "react-icons/io";
-import { BiSolidDetail } from "react-icons/bi";
-import { RiDeleteBin6Line } from 'react-icons/ri';
+import React, { useState, useEffect } from "react";
+import { Box, Tabs, Tab, IconButton, Typography, Button, Collapse, Tooltip, TextField, MenuItem } from "@mui/material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { IoMdAddCircleOutline } from "react-icons/io";
+import toast from "react-hot-toast";
+import axios from "axios";
+import { usePageTitle } from "../layout";
+import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText } from "@mui/material";
 
-function Notifications() {
-    const [notification, setNotification] = React.useState({
-        lecturer: "",
-        venue: "",
-        unit: "",
-        saa: "",
-        detail: "",
-    });
-    const [buttonDisabled, setButtonDisabled] = React.useState(false);
-    const [loading, setLoading] = React.useState(false);
-    const [getNotification, setGetNotification] = React.useState([])
+const themeColor = "#50765F";
+const secondaryColor = "#D0DCD0";
 
-    const onSend = async () => {
-        try {
-            setLoading(true);
-            const response = await axios.post("/api/users/notification", notification);
-            console.log("API Response:", response.data);
-        } catch (error: any) {
-            console.log("Upload failed", error.message);
-            toast.error(error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (notification.lecturer.length > 0 && notification.saa.length > 0 && notification.unit.length > 0 && notification.venue.length > 0 && notification.detail.length > 0) {
-            setButtonDisabled(false);
-        } else {
-            setButtonDisabled(true);
-        }
-    }, [notification]);
-    const fetchData = async () => {
-        try {
-            const response = await axios.get('/api/users/notification');
-            // const note = setGetNotification(response.data.notifications);
-            console.log(response)
-            const notify = Array.isArray(response.data)
-                ? response.data.map(notification => ({
-                    id: notification._id,
-                    lecturer: notification.lecturer,
-                    venue: notification.venue,
-                    unit: notification.unit,
-                    saa: notification.saa,
-                    detail: notification.detail,
-                }))
-                : [];
-            console.log(notify)
-            return notify;
-        } catch (error) {
-            console.error('Failed to fetch notifications:', error);
-        }
-    };
-
-    useEffect(() => {
-        const fetchAndSetNotifications = async () => {
-            try {
-                const note = await fetchData();
-                setGetNotification(note);
-            } catch (error) {
-                console.error('Failed to fetch notifications:', error);
-            }
-        };
-
-        fetchAndSetNotifications();
-    }, []);
-
-    const handleDeleteNotification = async (id) => {
-        try {
-            await axios.delete(`/api/users/notification?id=${id}`);
-            setGetNotification(notification.filter(notification => notification.id !== id));
-        } catch (error) {
-            console.error('Failed to delete notification:', error);
-        }
-    };
-
-    return (
-        <main className='bg-white w-full pt-24'>
-            <Header category="Page" title="Notifications" />
-            <div className='flex w-full'>
-                <div className='w-[40%] flex flex-col'>
-                    <h1 className="text-black font-bold text-lg mb-5">{loading ? "Posting..." : "Add Notification"}</h1>
-                    <hr />
-                    <div className="flex items-center  border border-gray-600 rounded-full bg-white w-[300px] px-4 mb-4">
-                        <FaUser className="text-black  w-5 h-5 ml-1 " />
-                        <input
-                            className="p-2 rounded-lg focus:outline-none focus:border-gray-600 text-black"
-                            id="password"
-                            type="text"
-                            value={notification.lecturer}
-                            onChange={(e) => setNotification({ ...notification, lecturer: e.target.value })}
-                            placeholder="Lecturer"
-                        />
-                    </div>
-                    <div className="flex items-center  border border-gray-600 rounded-full bg-white w-[300px] px-4 mb-4">
-                        <FaBuilding className="text-black  w-5 h-5 ml-1 " />
-                        <input
-                            className="p-2 rounded-lg focus:outline-none focus:border-gray-600 text-black"
-                            id="password"
-                            type="text"
-                            value={notification.venue}
-                            onChange={(e) => setNotification({ ...notification, venue: e.target.value })}
-                            placeholder="Venue"
-                        />
-                    </div>
-                    <div className="flex items-center  border border-gray-600 rounded-full bg-white w-[300px] px-4 mb-4">
-                        <MdClass className="text-black  w-5 h-5 ml-1 " />
-                        <input
-                            className="p-2 rounded-lg focus:outline-none focus:border-gray-600 text-black"
-                            id="unit"
-                            type="text"
-                            value={notification.unit}
-                            onChange={(e) => setNotification({ ...notification, unit: e.target.value })}
-                            placeholder="Unit"
-                        />
-                    </div>
-                    <div className="flex items-center  border border-gray-600 rounded-full bg-white w-[300px] px-4 mb-4">
-                        <IoIosTime className="text-black  w-5 h-5 ml-1 " />
-                        <input
-                            className="p-2 rounded-lg focus:outline-none focus:border-gray-600 text-black"
-                            id="saa"
-                            type="text"
-                            value={notification.saa}
-                            onChange={(e) => setNotification({ ...notification, saa: e.target.value })}
-                            placeholder="Time"
-                        />
-                    </div>
-                    <div className="flex items-center  border border-gray-600 rounded-full bg-white w-[300px] px-4 mb-4">
-                        <BiSolidDetail className="text-black  w-5 h-5 ml-1 " />
-                        <input
-                            className="p-2 rounded-lg focus:outline-none focus:border-gray-600 text-black"
-                            id="password"
-                            type="textarea"
-                            value={notification.detail}
-                            onChange={(e) => setNotification({ ...notification, detail: e.target.value })}
-                            placeholder="Detail"
-                        />
-                    </div>
-                    <button
-                        onClick={onSend}
-                        className="p-2 border border-gray-300 bg-blue-800 text-black rounded-full w-[300px] mb-4 focus:outline-none focus:border-gray-600"
-                    >
-                        Post
-                    </button>
-                </div>
-                <div className='mr-3'>
-                    <h1 className='text-black font-bold text-lg mb-5'>Your Notifications</h1>
-                    <div className='grid grid-cols-3'>
-                        {getNotification.map(notification => (
-                            <div key={notification.id} className="p-1 flex-col bg-slate-300 rounded my-1 mx-2">
-                                <div className="flex items-center  p-3">
-                                    <div className="flex flex-col">
-                                        <div className="flex">
-                                            <div className='bg-white mr-1 p-1 rounded-lg h-8 w-8 '><FaUser className="text-black  w-4 h-4 ml-1 " /></div>
-                                            <div className='flex flex-col ml-1'><h1 className="text-sm font-bold text-black">{notification.lecturer}</h1>
-                                                <div className='flex'><span className="text-sm font-bold text-stone-900">{notification.unit}</span>
-                                                <span className="text-stone-700 text-sm ml-2 font-poppins">{notification.venue}</span></div>
-                                                <p className="text-stone-800 text-sm font-poppins">{notification.detail} @ {notification.saa}</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => handleDeleteNotification(notification.id)}
-                                            className="flex rounded-lg p-2 justify-center align-center place-items-center w-full bg-red-600 text-white"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </main>
-    )
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  recipient_type: string;
+  target_scope: string;
+  course?: string;
+  year?: string;
+  target_id?: string;
+  status: "UNREAD" | "READ";
 }
 
-export default Notifications
+const API_URL = "/api/users/notification";
+
+export default function NotificationsPage() {
+  const { setTitle } = usePageTitle();
+  const [activeTab, setActiveTab] = useState(0);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const [formData, setFormData] = useState({
+    recipient_type: "STUDENT",
+    target_scope: "ALL",
+    course: "",
+    year: "",
+    target_id: "",
+    title: "",
+    message: "",
+  });
+
+  useEffect(() => {
+    setTitle("Notifications");
+    fetchNotifications();
+  }, [setTitle, activeTab]);
+
+  const fetchNotifications = async () => {
+    try {
+      const type = activeTab === 0 ? "system" : "sent";
+      const res = await axios.get(`${API_URL}?type=${type}`);
+      setNotifications(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      toast.error("Failed to fetch notifications");
+    }
+  };
+
+  const handleSendNotification = async () => {
+    if (!formData.title || !formData.message)
+      return toast.error("Title and message required");
+
+    let finalTargetCourse = formData.course || null;
+    let finalTargetYear = null;
+
+    if (formData.target_scope === "COURSE_YEAR") finalTargetYear = formData.year;
+    else if (formData.target_scope === "ALL") {
+      finalTargetCourse = null;
+      finalTargetYear = null;
+    }
+
+    let targetTypeToSend = "";
+    if (formData.target_scope === "ALL" && formData.recipient_type === "STUDENT")
+      targetTypeToSend = "ALL_STUDENTS";
+    else if (
+      formData.target_scope === "ALL" &&
+      formData.recipient_type === "LECTURER"
+    )
+      targetTypeToSend = "ALL_LECTURERS";
+    else if (formData.target_scope === "SPECIFIC") targetTypeToSend = "USER";
+    else targetTypeToSend = "COURSE";
+
+    const payload = {
+      title: formData.title,
+      message: formData.message,
+      targetType: targetTypeToSend,
+      targetCourse: finalTargetCourse,
+      targetYear: finalTargetYear,
+      targetRegNo:
+        formData.recipient_type === "STUDENT" &&
+        formData.target_scope === "SPECIFIC"
+          ? formData.target_id
+          : undefined,
+      targetEmail:
+        formData.recipient_type === "LECTURER" &&
+        formData.target_scope === "SPECIFIC"
+          ? formData.target_id
+          : undefined,
+    };
+
+    try {
+      await axios.post(API_URL, payload);
+      toast.success("✅ Notification sent!");
+      setFormData({
+        recipient_type: "STUDENT",
+        target_scope: "ALL",
+        course: "",
+        year: "",
+        target_id: "",
+        title: "",
+        message: "",
+      });
+      setOpenDialog(false);
+      fetchNotifications();
+    } catch {
+      toast.error("Failed to send notification");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await axios.delete(`${API_URL}/${id}`);
+      setNotifications(notifications.filter((n) => n.id !== id));
+      setConfirmOpen(true);
+      // toast.success("🗑️ Notification deleted");
+    } catch {
+      toast.error("Failed to delete notification");
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!notifications.id) return;
+    try {
+      await axios.delete(`${API_URL}/${deleteId}`);
+      setRows(rows.filter((row) => row.id !== deleteId));
+      toast.success("Notification deleted");
+    } catch (error) {
+      console.error("Failed to delete notification", error);
+      toast.error("Failed to delete notification");
+    } finally {
+      setConfirmOpen(false);
+      setDeleteId(null);
+    }
+  };
+
+  return (
+    <Box sx={{ px: 3, pt: 4, maxWidth: "900px", mx: "auto" }}>
+      {/* Send Notification Button */}
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+        <Button
+          startIcon={<IoMdAddCircleOutline />}
+          variant="contained"
+          sx={{
+            backgroundColor: themeColor,
+            "&:hover": { backgroundColor: "#3f5f4b" },
+            textTransform: "none",
+            borderRadius: "6px",
+            px: 2,
+            py: 1,
+          }}
+          onClick={() => setOpenDialog(true)}
+        >
+          Send Notification
+        </Button>
+      </Box>
+
+      {/* Tabs Header */}
+      <Tabs
+        value={activeTab}
+        onChange={(_, v) => setActiveTab(v)}
+        TabIndicatorProps={{
+          style: { backgroundColor: themeColor, height: 3, borderRadius: 2 },
+        }}
+        sx={{
+          mb: 3,
+          "& .MuiTab-root": {
+            textTransform: "none",
+            fontWeight: 600,
+            color: "#444",
+          },
+          "& .Mui-selected": {
+            color: themeColor + " !important",
+          },
+        }}
+      >
+        <Tab label="System Notifications" />
+        <Tab label="Sent Notifications" />
+      </Tabs>
+
+      {/* Notifications */}
+      {notifications.length === 0 ? (
+        <Box
+          sx={{
+            mt: 6,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: "1rem",
+              color: themeColor,
+              fontWeight: 500,
+            }}
+          >
+            No notifications available
+          </Typography>
+        </Box>
+      ) : (
+        notifications.map((n) => (
+          <Box
+            key={n.id}
+            sx={{
+              p: 2,
+              mb: 1.5,
+              bgcolor: secondaryColor,
+              borderRadius: 2,
+              border: "1px solid #c7d2c7",
+              position: "relative",
+              "&:hover": { backgroundColor: "#c9d5c9" },
+              cursor: "pointer",
+            }}
+            onClick={() => setExpandedId(expandedId === n.id ? null : n.id)}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography fontWeight="600" color={themeColor}>
+                {n.title}
+              </Typography>
+              {n.status === "UNREAD" && (
+                <Typography variant="caption" color="primary">
+                  New
+                </Typography>
+              )}
+            </Box>
+
+            <Collapse in={expandedId === n.id}>
+              <Box mt={1} sx={{ position: "relative", pb: 4 }}>
+                <Typography variant="body2">{n.message}</Typography>
+                {n.course && (
+                  <Typography variant="caption" sx={{ display: "block" }}>
+                    Course: {n.course}
+                  </Typography>
+                )}
+                {n.year && (
+                  <Typography variant="caption" sx={{ display: "block" }}>
+                    Year: {n.year}
+                  </Typography>
+                )}
+                {n.target_id && (
+                  <Typography variant="caption" sx={{ display: "block" }}>
+                    Target: {n.target_id}
+                  </Typography>
+                )}
+
+                {/* Delete Icon pinned bottom-right */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    bottom: 8,
+                    right: 8,
+                  }}
+                >
+                  <Tooltip title="Delete" arrow>
+                    <IconButton
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(n.id);
+                      }}
+                      sx={{
+                        color: "red",
+                        transition: "transform 0.15s ease",
+                        "&:hover": { transform: "scale(1.1)" },
+                      }}
+                    >
+                      <DeleteIcon/>
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            </Collapse>
+          </Box>
+        ))
+      )}
+
+      {/* Send Notification Modal */}
+      {openDialog && (
+        <Box
+          sx={{
+            position: "fixed",
+            inset: 0,
+            bgcolor: "rgba(0,0,0,0.4)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 10,
+          }}
+        >
+          <Box
+            sx={{
+              bgcolor: "#fff",
+              p: 4,
+              borderRadius: 3,
+              width: "100%",
+              maxWidth: 500,
+              boxShadow: "0 6px 25px rgba(0,0,0,0.2)",
+            }}
+          >
+            <Typography
+              variant="h6"
+              mb={2}
+              sx={{ color: themeColor, fontWeight: 700 }}
+            >
+              Send Notification
+            </Typography>
+
+            {/* Recipient Type */}
+            <TextField
+              select
+              label="Recipient Type"
+              fullWidth
+              value={formData.recipient_type}
+              onChange={(e) =>
+                setFormData({ ...formData, recipient_type: e.target.value })
+              }
+              sx={{ mb: 2 }}
+            >
+              <MenuItem value="STUDENT">Student</MenuItem>
+              <MenuItem value="LECTURER">Lecturer</MenuItem>
+            </TextField>
+
+            {/* Target Scope */}
+            <TextField
+              select
+              label="Target Scope"
+              fullWidth
+              value={formData.target_scope}
+              onChange={(e) =>
+                setFormData({ ...formData, target_scope: e.target.value })
+              }
+              sx={{ mb: 2 }}
+            >
+              <MenuItem value="ALL">All</MenuItem>
+              {formData.recipient_type === "STUDENT" && (
+                <>
+                  <MenuItem value="COURSE">Course</MenuItem>
+                  <MenuItem value="COURSE_YEAR">Course + Year</MenuItem>
+                </>
+              )}
+              <MenuItem value="SPECIFIC">Specific</MenuItem>
+            </TextField>
+
+            {/* Conditional Inputs */}
+            {(formData.target_scope === "COURSE" ||
+              formData.target_scope === "COURSE_YEAR") && (
+              <TextField
+                label="Course"
+                fullWidth
+                value={formData.course}
+                onChange={(e) =>
+                  setFormData({ ...formData, course: e.target.value })
+                }
+                sx={{ mb: 2 }}
+              />
+            )}
+
+            {formData.target_scope === "COURSE_YEAR" && (
+              <TextField
+                select
+                label="Year"
+                fullWidth
+                value={formData.year}
+                onChange={(e) =>
+                  setFormData({ ...formData, year: e.target.value })
+                }
+                sx={{ mb: 2 }}
+              >
+                {[1, 2, 3, 4, 5, 6].map((y) => (
+                  <MenuItem key={y} value={y}>
+                    {y}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+
+            {formData.target_scope === "SPECIFIC" && (
+              <TextField
+                label={
+                  formData.recipient_type === "STUDENT"
+                    ? "Registration Number"
+                    : "Employee Number"
+                }
+                fullWidth
+                value={formData.target_id}
+                onChange={(e) =>
+                  setFormData({ ...formData, target_id: e.target.value })
+                }
+                sx={{ mb: 2 }}
+              />
+            )}
+
+            {/* Title & Message */}
+            <TextField
+              label="Title"
+              fullWidth
+              value={formData.title}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              label="Message"
+              fullWidth
+              multiline
+              minRows={3}
+              value={formData.message}
+              onChange={(e) =>
+                setFormData({ ...formData, message: e.target.value })
+              }
+              sx={{ mb: 2 }}
+            />
+
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
+              <Typography
+                sx={{
+                  color: themeColor,
+                  cursor: "pointer",
+                  "&:hover": { textDecoration: "underline" },
+                }}
+                onClick={() => setOpenDialog(false)}
+              >
+                Cancel
+              </Typography>
+              <Button
+                variant="contained"
+                sx={{
+                  backgroundColor: themeColor,
+                  "&:hover": { backgroundColor: "#3f5f4b" },
+                  textTransform: "none",
+                }}
+                onClick={handleSendNotification}
+              >
+                Send
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+          open={confirmOpen}
+          onClose={() => setConfirmOpen(false)}
+          fullWidth
+          maxWidth="xs"
+          PaperProps={{
+            sx: { borderRadius: 3, boxShadow: 6 },
+          }}
+        >
+        <DialogTitle sx={{ color: themeColor, fontWeight: 700 }}>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this student? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button variant="outlined" sx={{ borderColor: themeColor, color: themeColor }} onClick={() => setConfirmOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="contained" color="error" onClick={confirmDelete}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}

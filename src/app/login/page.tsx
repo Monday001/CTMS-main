@@ -1,90 +1,241 @@
 "use client";
-import Link from "next/link";
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { toast } from "react-hot-toast";
-import { MdEmail } from "react-icons/md";
-import { RiLockPasswordFill } from "react-icons/ri";
+import toast from "react-hot-toast";
+import {
+  Box,
+  Typography,
+  TextField,
+  Button,
+  CircularProgress,
+  MenuItem,
+} from "@mui/material";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [user, setUser] = React.useState({
-    email: "",
-    password: "",
-  });
-  const [buttonDisabled, setButtonDisabled] = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
+  const [role, setRole] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [employeeNumber, setEmployeeNumber] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const onLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const loadingToast = toast.loading("Logging in...");
+
     try {
-      setLoading(true);
-      const response = await axios.post("/api/users/login", user);
-      console.log("API Response:", response.data);
-      const role = response.data.role;
-      console.log("Login success", response.data.role)
+      // Determine credentials based on role
+      const credentials =
+        role === "STUDENT"
+          ? { registrationNumber, password, role }
+          : role === "LECTURER"
+          ? { employeeNumber, password, role }
+          : { email, password, role };
 
-      if (role === "ADMIN") {
+      const response = await axios.post("/api/users/login", credentials);
+      const userRole = response.data.role;
+
+      toast.success("Login successful!", { id: loadingToast });
+
+      // Redirect based on role
+      if (userRole === "ADMIN") {
         router.push("/Admin");
-        toast.success("Welcome, Admin Login success");
-      } else if (role === "STUDENT") {
+      } else if (userRole === "LECTURER") {
+        router.push("/LecturerDashboard");
+      } else if (userRole === "STUDENT") {
         router.push("/Student");
-        toast.success("Welcome, Student Login success");
       } else {
-        router.push("/login");
-        toast.success("Sorry, Login Failed");
+        router.push("/"); // fallback
       }
     } catch (error: any) {
-      console.log("Login failed", error.message);
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || "Invalid credentials", {
+        id: loadingToast,
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (user.email.length > 0 && user.password.length > 0) {
-      setButtonDisabled(false);
-    } else {
-      setButtonDisabled(true);
-    }
-  }, [user]);
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-2 bg-[#50765F]">
-      <h1 className="text-black font-bold text-5xl mb-5">{loading ? "Processing" : "Sign in to CTMS"}</h1>
-      <hr />
-
-      <div className="flex items-center  border border-gray-300 rounded-full bg-white w-[300px] px-4 mb-4">
-        <MdEmail className="text-black  w-5 h-5 ml-1 " />
-        <input
-          className="p-2 rounded-lg focus:outline-none focus:border-gray-600 text-black"
-          id="email"
-          type="text"
-          value={user.email}
-          onChange={(e) => setUser({ ...user, email: e.target.value })}
-          placeholder="Email"
-        />
-      </div>
-      <div className="flex items-center  border border-gray-300 rounded-full bg-white w-[300px] px-4 mb-4">
-        <RiLockPasswordFill className="text-black  w-5 h-5 ml-1 " />
-        <input
-          className="p-2 rounded-lg focus:outline-none focus:border-gray-600 text-black"
-          id="password"
-          type="password"
-          value={user.password}
-          onChange={(e) => setUser({ ...user, password: e.target.value })}
-          placeholder="Password"
-        />
-      </div>
-      <button
-        onClick={onLogin}
-        className="p-2 border border-gray-300 rounded-full w-[300px] mb-4 focus:outline-none focus:border-gray-600"
+    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#fff" }}>
+      {/* Left Section: Image with Green Overlay */}
+      <Box
+        sx={{
+          width: "50%",
+          display: { xs: "none", md: "flex" },
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundImage: `
+            linear-gradient(to right, #50765F, rgba(255, 255, 255, 1)),
+            url('https://images.unsplash.com/photo-1503676260728-1c00da094a0b')
+          `,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          color: "#50765F",
+          textAlign: "center",
+          px: 4,
+        }}
       >
-        Login here
-      </button>
-      <Link href="/signup" className="font-semibold">Visit Signup page</Link>
-      <Link href="/" className="font-semibold text-green-500">Home</Link>
-    </div>
+        <Box sx={{ maxWidth: 480 }}>
+          <Typography variant="h3" fontWeight="bold" mb={2}>
+            Welcome to CTMS
+          </Typography>
+          <Typography variant="body1" fontSize="1.1rem">
+            Manage your classes, stay organized, and access your academic
+            information in one place.
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Right Section: Login Form */}
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "white",
+          p: 4,
+        }}
+      >
+        <Typography
+          variant="h4"
+          fontWeight="bold"
+          textAlign="center"
+          color="#50765F"
+          mb={4}
+        >
+          Sign in to CTMS
+        </Typography>
+
+        <Box
+          component="form"
+          onSubmit={handleLogin}
+          sx={{
+            width: "100%",
+            maxWidth: 400,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          {/* Role Selector */}
+          <TextField
+            select
+            label="Role"
+            variant="outlined"
+            fullWidth
+            required
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+          >
+            <MenuItem value="">Select Role</MenuItem>
+            <MenuItem value="ADMIN">Admin</MenuItem>
+            <MenuItem value="LECTURER">Lecturer</MenuItem>
+            <MenuItem value="STUDENT">Student</MenuItem>
+          </TextField>
+
+          {/* Conditional Field */}
+          {role === "STUDENT" && (
+            <TextField
+              label="Registration Number"
+              variant="outlined"
+              fullWidth
+              required
+              value={registrationNumber}
+              onChange={(e) => setRegistrationNumber(e.target.value)}
+            />
+          )}
+
+          {role === "LECTURER" && (
+            <TextField
+              label="Employee Number"
+              variant="outlined"
+              fullWidth
+              required
+              value={employeeNumber}
+              onChange={(e) => setEmployeeNumber(e.target.value)}
+            />
+          )}
+
+          {role === "ADMIN" && (
+            <TextField
+              label="Email"
+              variant="outlined"
+              fullWidth
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          )}
+
+          <TextField
+            label="Password"
+            variant="outlined"
+            type="password"
+            fullWidth
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            disabled={loading}
+            sx={{
+              mt: 1,
+              backgroundColor: "#50765F",
+              "&:hover": { backgroundColor: "#059669" },
+              color: "white",
+              fontWeight: "bold",
+              py: 1.2,
+              borderRadius: "10px",
+              textTransform: "none",
+            }}
+          >
+            {loading ? <CircularProgress size={24} color="inherit" /> : "Login"}
+          </Button>
+        </Box>
+
+        <Box
+          sx={{
+            width: "100%",
+            maxWidth: 400,
+            display: "flex",
+            justifyContent: "space-between",
+            mt: 3,
+            fontSize: "0.9rem",
+          }}
+        >
+          <a
+            href="/"
+            style={{
+              color: "#10B981",
+              textDecoration: "none",
+              fontWeight: "500",
+            }}
+          >
+            ← Back to Home
+          </a>
+
+          <a
+            href="/signup"
+            style={{
+              color: "#10B981",
+              textDecoration: "none",
+              fontWeight: "500",
+            }}
+          >
+            Sign up →
+          </a>
+        </Box>
+      </Box>
+    </Box>
   );
 }

@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import {
   DataGrid,
@@ -28,6 +28,8 @@ import toast from "react-hot-toast";
 import { usePageTitle } from "../layout";
 
 const API_URL = "/api/users/lecturer";
+const themeColor = "#50765F";
+const headerBg = "#D0DCD0";
 
 const getLecturers = async () => {
   try {
@@ -48,15 +50,23 @@ const getLecturers = async () => {
   }
 };
 
-// Toolbar with "Add Lecturer"
+// "Add Lecturer" button
 function EditToolbar({ onAddClick }: { onAddClick: () => void }) {
   return (
     <Box sx={{ display: "flex", justifyContent: "flex-start", p: 1 }}>
       <Button
-        color="primary"
-        startIcon={<AddIcon />}
+        startIcon={<AddIcon sx={{ color: "white" }} />}
         onClick={onAddClick}
         variant="contained"
+        sx={{
+          backgroundColor: themeColor,
+          "&:hover": { backgroundColor: "#3f5f4b" },
+          textTransform: "none",
+          fontWeight: 600,
+          color: "white",
+          borderRadius: "5px",
+          px: 2,
+        }}
       >
         Add Lecturer
       </Button>
@@ -68,8 +78,8 @@ export default function LecturersPage() {
   const { setTitle } = usePageTitle();
   const [rows, setRows] = useState<GridRowsProp>([]);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
-  const [open, setOpen] = useState(false); // Add/Edit dialog
-  const [confirmOpen, setConfirmOpen] = useState(false); // Delete confirmation
+  const [open, setOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -80,10 +90,8 @@ export default function LecturersPage() {
     employeeNumber: "",
   });
 
-  // Set page title
   useEffect(() => setTitle("Lecturers"), [setTitle]);
 
-  // Fetch lecturers
   useEffect(() => {
     const fetchData = async () => {
       const data = await getLecturers();
@@ -98,14 +106,12 @@ export default function LecturersPage() {
     }
   };
 
-  // Add Lecturer
   const handleAddClick = () => {
     setFormData({ firstname: "", lastname: "", email: "", password: "", employeeNumber: "" });
     setEditingId(null);
     setOpen(true);
   };
 
-  // Edit Lecturer
   const handleEditClick = (id: GridRowId) => {
     const lecturer = rows.find((row) => row.id === id);
     if (!lecturer) return;
@@ -120,7 +126,6 @@ export default function LecturersPage() {
     setOpen(true);
   };
 
-  // Delete Lecturer (open confirmation dialog)
   const handleDeleteClick = (id: GridRowId) => () => {
     setDeleteId(String(id));
     setConfirmOpen(true);
@@ -141,11 +146,9 @@ export default function LecturersPage() {
     }
   };
 
-  // Save Lecturer (Add or Edit)
   const handleSaveLecturer = async () => {
     try {
       if (editingId) {
-        // Update
         await axios.put(`${API_URL}/${editingId}`, {
           firstname: formData.firstname,
           lastname: formData.lastname,
@@ -154,7 +157,6 @@ export default function LecturersPage() {
         });
         toast.success("Lecturer updated!");
       } else {
-        // Create
         await axios.post(API_URL, formData);
         toast.success("Lecturer created!");
       }
@@ -183,16 +185,14 @@ export default function LecturersPage() {
       flex: 0.8,
       getActions: ({ id }) => [
         <GridActionsCellItem
-          icon={<EditIcon />}
+          icon={<EditIcon sx={{ color: themeColor }} />}
           label="Edit"
           onClick={() => handleEditClick(id)}
-          color="inherit"
         />,
         <GridActionsCellItem
-          icon={<DeleteIcon />}
+          icon={<DeleteIcon sx={{ color: themeColor }} />}
           label="Delete"
           onClick={handleDeleteClick(id)}
-          color="inherit"
         />,
       ],
     },
@@ -200,7 +200,17 @@ export default function LecturersPage() {
 
   return (
     <>
-      <Box sx={{ flexGrow: 1, width: "100%", height: "calc(100vh - 150px)", px: 2, pt: 2, display: "flex", justifyContent: "center" }}>
+      <Box
+        sx={{
+          flexGrow: 1,
+          width: "100%",
+          height: "calc(100vh - 150px)",
+          px: 2,
+          pt: 2,
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
         <Box sx={{ flexGrow: 1, maxWidth: "1200px", width: "100%" }}>
           <DataGrid
             rows={rows}
@@ -214,16 +224,42 @@ export default function LecturersPage() {
             sx={{
               backgroundColor: "transparent",
               border: "none",
-              "& .MuiDataGrid-cell": { borderBottom: "1px solid #e0e0e0" },
-              "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f5f5f5", fontWeight: "bold" },
+              "& .MuiDataGrid-cell": {
+                borderBottom: "1px solid #e0e0e0",
+              },
+              "& .MuiDataGrid-columnHeaders": {
+                backgroundColor: headerBg,
+                fontWeight: "bold",
+                fontSize: "0.95rem",
+                color: "#333",
+              },
+              "& .MuiDataGrid-row:hover": {
+                backgroundColor: `${themeColor}10`,
+              },
             }}
           />
         </Box>
       </Box>
 
       {/* Add/Edit Lecturer Dialog */}
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editingId ? "Edit Lecturer" : "Add Lecturer"}</DialogTitle>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: { borderRadius: 3, boxShadow: 6 },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            color: themeColor,
+            fontWeight: 700,
+            fontSize: "1.2rem",
+          }}
+        >
+          {editingId ? "Edit Lecturer" : "Add Lecturer"}
+        </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
           <TextField label="First Name" value={formData.firstname} onChange={(e) => setFormData({ ...formData, firstname: e.target.value })} />
           <TextField label="Last Name" value={formData.lastname} onChange={(e) => setFormData({ ...formData, lastname: e.target.value })} />
@@ -231,11 +267,14 @@ export default function LecturersPage() {
           {!editingId && <TextField label="Password" type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />}
           <TextField label="Employee Number" value={formData.employeeNumber} onChange={(e) => setFormData({ ...formData, employeeNumber: e.target.value })} />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button variant="outlined" sx={{ borderColor: themeColor, color: themeColor }} onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
           <Button
             onClick={handleSaveLecturer}
             variant="contained"
+            sx={{ backgroundColor: themeColor, "&:hover": { backgroundColor: "#3f5f4b" } }}
             disabled={
               !formData.firstname ||
               !formData.lastname ||
@@ -250,14 +289,28 @@ export default function LecturersPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Confirm Delete</DialogTitle>
+      <Dialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{
+          sx: { borderRadius: 3, boxShadow: 6 },
+        }}
+      >
+        <DialogTitle sx={{ color: themeColor, fontWeight: 700 }}>Confirm Delete</DialogTitle>
         <DialogContent>
-          <DialogContentText>Are you sure you want to delete this lecturer? This action cannot be undone.</DialogContentText>
+          <DialogContentText>
+            Are you sure you want to delete this lecturer? This action cannot be undone.
+          </DialogContentText>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-          <Button onClick={confirmDelete} color="error" variant="contained">Delete</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button variant="outlined" sx={{ borderColor: themeColor, color: themeColor }} onClick={() => setConfirmOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="contained" color="error" onClick={confirmDelete}>
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </>

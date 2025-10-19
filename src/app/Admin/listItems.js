@@ -4,11 +4,11 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import ListSubheader from "@mui/material/ListSubheader";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import PeopleIcon from "@mui/icons-material/People";
 import BarChartIcon from "@mui/icons-material/BarChart";
-import LayersIcon from "@mui/icons-material/Layers";
+import { BsFiletypePdf } from "react-icons/bs";
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import { FaUsers, FaChalkboardTeacher, FaCalendarAlt, FaClipboardList } from "react-icons/fa";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import Link from "next/link";
 
@@ -24,15 +24,15 @@ export const mainListItems = (
     </ListItemButton>
     <ListItemButton>
       <ListItemIcon>
-      <PeopleIcon />
+      <FaChalkboardTeacher />
       </ListItemIcon>
       <Link href="/Admin/Lecturers">
-        <ListItemText primary="Lecturer" />
+        <ListItemText primary="Lecturers" />
       </Link>
     </ListItemButton>
     <ListItemButton>
       <ListItemIcon>
-        <PeopleIcon />
+        <FaUsers />
       </ListItemIcon>
       <Link href="/Admin/Student">
         <ListItemText primary="Students" />
@@ -48,7 +48,7 @@ export const mainListItems = (
     </ListItemButton>
     <ListItemButton>
       <ListItemIcon>
-        <LayersIcon />
+        <FaCalendarAlt />
       </ListItemIcon>
       <Link href="/Admin/Timetable">
         <ListItemText primary="Timetables" />

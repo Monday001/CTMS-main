@@ -5,54 +5,102 @@ import pool from "@/dbConfig/dbConfig";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, registrationNumber, employeeNumber, role } =
+      await request.json();
 
-    console.log("📩 Incoming login request:", { email });
+    console.log("📩 Login request received for role:", role);
 
-    // get user by email
-    const [rows]: any = await pool.query(
-      "SELECT * FROM users WHERE email = ? LIMIT 1",
-      [email]
-    );
+    let query = "";
+    let value: any[] = [];
+
+    // Decide which identifier to use
+    if (role === "ADMIN") {
+      query = "SELECT * FROM users WHERE email = ? AND role = 'ADMIN' LIMIT 1";
+      value = [email];
+    } else if (role === "LECTURER") {
+      query = `
+        SELECT u.*, l.employeeNumber 
+        FROM users u 
+        JOIN lecturer l ON l.userId = u.id 
+        WHERE l.employeeNumber = ? AND u.role = 'LECTURER' 
+        LIMIT 1
+      `;
+      value = [employeeNumber];
+    } else if (role === "STUDENT") {
+      query = `
+        SELECT u.*, s.registrationNumber 
+        FROM users u 
+        JOIN student s ON s.id = u.id 
+        WHERE s.registrationNumber = ? AND u.role = 'STUDENT' 
+        LIMIT 1
+      `;
+      value = [registrationNumber];
+    } else {
+      return NextResponse.json(
+        { error: "Invalid role selected" },
+        { status: 400 }
+      );
+    }
+
+    const [rows]: any = await pool.query(query, value);
 
     if (rows.length === 0) {
-      console.warn("❌ User not found:", email);
-      return NextResponse.json({ error: "User doesn't exist" }, { status: 400 });
+      console.warn("❌ User not found for role:", role);
+      return NextResponse.json(
+        { message: "Account not found. Please check your credentials." },
+        { status: 400 }
+      );
     }
 
     const user = rows[0];
-    console.log("✅ User found:", user.username);
+    console.log("✅ User record found:", user.firstname, user.lastname);
 
-    // validate password
-    const validPassword = await bcryptjs.compare(password, user.password);
-    if (!validPassword) {
-      console.warn("❌ Invalid password attempt for:", email);
-      return NextResponse.json({ error: "Password did not match" }, { status: 400 });
+    // Validate password
+    const isPasswordValid = await bcryptjs.compare(password, user.password);
+    if (!isPasswordValid) {
+      console.warn("❌ Incorrect password for user:", user.id);
+      return NextResponse.json(
+        { message: "Incorrect password" },
+        { status: 400 }
+      );
     }
 
-    // token payload
+    // Prepare token payload
     const tokenData = {
       id: user.id,
-      username: user.username,
+      firstname: user.firstname,
+      lastname: user.lastname,
       email: user.email,
       role: user.role,
     };
 
-    // sign JWT
-    const token = jwt.sign(tokenData, process.env.JWT_TOKEN_SECRET!, { expiresIn: "1d" });
+    // Sign JWT token
+    const token = jwt.sign(tokenData, process.env.JWT_TOKEN_SECRET!, {
+      expiresIn: "1d",
+    });
 
+    // Send token as cookie
     const response = NextResponse.json({
       message: "Login successful",
       success: true,
       role: user.role,
+      fullname: `${user.firstname} ${user.lastname}`,
     });
 
-    response.cookies.set("token", token, { httpOnly: true, secure: true, sameSite: "strict" });
-    console.log("✅ Login successful:", email);
+    response.cookies.set("token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+    });
 
+    console.log("✅ Login success for:", user.role);
     return response;
   } catch (error: any) {
     console.error("🔥 Login error:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Login failed" },
+      { status: 500 }
+    );
   }
 }

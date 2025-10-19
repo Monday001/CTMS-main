@@ -50,6 +50,8 @@ const Drawer = styled(MuiDrawer, {
     position: "relative",
     whiteSpace: "nowrap",
     width: drawerWidth,
+    height: "100vh", 
+    backgroundColor: "#D0DCD0", 
     transition: theme.transitions.create("width", {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,
@@ -85,31 +87,67 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [title, setTitle] = useState("Dashboard");
   const router = useRouter();
 
+  // ✅ Toggle Drawer
   useEffect(() => {
     setOpen((prevOpen) => !prevOpen);
   }, []);
 
   const toggleDrawer = () => setOpen((prevOpen) => !prevOpen);
 
+  // ✅ Axios Interceptor for Token Expiry
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          toast.error("Session expired, please log in again.");
+          router.push("/login");
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // Cleanup interceptor on unmount
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, [router]);
+
+  // ✅ Check session on mount
+  useEffect(() => {
+    const verifySession = async () => {
+      try {
+        const res = await axios.get("/api/users/check-session");
+        if (!res.data?.valid) {
+          throw new Error("Invalid session");
+        }
+      } catch {
+        toast.error("Session expired, please log in again.");
+        router.push("/login");
+      }
+    };
+
+    verifySession();
+  }, [router]);
+
+  // ✅ Logout
   const logout = async () => {
     try {
       await axios.get("/api/users/logout");
       toast.success("Logout successful");
       router.push("/login");
     } catch (error: any) {
-      console.log(error.message);
       toast.error(error.message);
     }
   };
 
   return (
     <PageTitleContext.Provider value={{ title, setTitle }}>
-      {/* ✅ No poppins.className needed here, font comes from body */}
       <div className="flex mx-auto w-full bg-white">
-        <Box sx={{ display: "flex", width: "100%" }}>
+        <Box sx={{ display: "flex", width: "100%", height: "100vh", backgroundColor: "#D0DCD0" }}>
           <CssBaseline />
-          <AppBar position="absolute" open={open}>
-            <Toolbar sx={{ pr: "24px" }}>
+          <AppBar className="bg-[#D0DCD0]" position="absolute" open={open}>
+            <Toolbar className="bg-[#50765F]" sx={{ pr: "24px" }}>
               <IconButton
                 edge="start"
                 color="inherit"
@@ -143,6 +181,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 alignItems: "center",
                 justifyContent: "flex-end",
                 px: [1],
+                backgroundColor: "#D0DCD0",
               }}
             >
               <IconButton onClick={toggleDrawer}>

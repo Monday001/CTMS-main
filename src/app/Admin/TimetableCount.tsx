@@ -1,8 +1,7 @@
 import * as React from 'react';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
-import { IoMdArrowDropup } from 'react-icons/io';
-import { BsFiletypePdf } from "react-icons/bs";
+import { FaCalendarAlt } from "react-icons/fa";
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 
@@ -28,7 +27,7 @@ export default function LecturerCount() {
   return (
     <React.Fragment>
       <button className="bg-none p-2 rounded-lg flex items-center">
-        <BsFiletypePdf className="relative text-lg ml-1 mr-1 text-stone-500" />
+        <FaCalendarAlt className="relative text-lg ml-1 mr-1 text-[#50765F]"/>
         <span className=" ml-2 text-base">
         Timetable
         </span>

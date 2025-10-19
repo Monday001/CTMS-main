@@ -1,72 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/dbConfig/dbConfig";
-import jwt from "jsonwebtoken";
-
-async function getDataFromToken(request: NextRequest) {
-  try {
-    const token = request.cookies.get("token")?.value || "";
-
-    if (!token) {
-      throw new Error("Token not found");
-    }
-
-    // verify and decode the JWT
-    const decodedToken: any = jwt.verify(token, process.env.JWT_TOKEN_SECRET!);
-
-    return decodedToken.id; // return the userId stored in the payload
-  } catch (error: any) {
-    throw new Error("Invalid or expired token");
-  }
-}
+import { verifyToken } from "@/lib/auth"; // ✅ Token verification
 
 export async function GET(request: NextRequest) {
-  try {
-    // extract user ID from JWT
-    const userID = await getDataFromToken(request);
+  const { valid, user, response } = verifyToken(request);
+  if (!valid) return response;
 
-    // fetch base user info
+  try {
+    const currentUser = user as any;
+
+    // Fetch base user info
     const [users]: any = await pool.query(
-      "SELECT id, username, email, role FROM users WHERE id = ? LIMIT 1",
-      [userID]
+      `SELECT id, firstname, lastname, email, role FROM users WHERE id = ? LIMIT 1`,
+      [currentUser.id]
     );
 
     if (users.length === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const user = users[0];
+    const userInfo = users[0];
     let extraData: any = {};
 
-    // fetch role-specific details
-    if (user.role === "STUDENT") {
+    // Attach role-specific details
+    if (userInfo.role === "STUDENT") {
       const [students]: any = await pool.query(
-        "SELECT registrationNumber, course, yearOfStudy FROM student WHERE userId = ? LIMIT 1",
-        [user.id]
+        `SELECT registrationNumber, course, yearOfStudy FROM student WHERE id = ? LIMIT 1`,
+        [userInfo.id]
       );
-      if (students.length > 0) {
-        extraData = students[0];
-      }
-    } else if (user.role === "LECTURER") {
+      if (students.length > 0) extraData = students[0];
+    } else if (userInfo.role === "LECTURER") {
       const [lecturers]: any = await pool.query(
-        "SELECT employeeNumber FROM lecturer WHERE userId = ? LIMIT 1",
-        [user.id]
+        `SELECT employeeNumber FROM lecturer WHERE userId = ? LIMIT 1`,
+        [userInfo.id]
       );
-      if (lecturers.length > 0) {
-        extraData = lecturers[0];
-      }
+      if (lecturers.length > 0) extraData = lecturers[0];
     }
 
     return NextResponse.json({
-      message: "User Found",
-      data: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        ...extraData,
-      },
+      message: "User profile retrieved successfully",
+      data: { ...userInfo, ...extraData },
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error("❌ /api/users/me error:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

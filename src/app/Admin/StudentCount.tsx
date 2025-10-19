@@ -1,7 +1,7 @@
 import * as React from 'react';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
-import { MdGroups3 } from "react-icons/md";
+import { FaUsers } from "react-icons/fa";
 import { FaCaretDown } from "react-icons/fa";
 import { useEffect, useState } from 'react';
 import axios from 'axios';
@@ -29,7 +29,7 @@ export default function StudentCount() {
   return (
     <React.Fragment>
       <button className="bg-none p-2 rounded-lg flex items-center">
-        <MdGroups3 className="relative text-lg ml-1 mr-1 text-stone-500" />
+        <FaUsers className="relative text-lg ml-1 mr-1 text-[#50765F]" />
         <span className=" ml-2 text-base">
         Students
         </span>
