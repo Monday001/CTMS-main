@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/dbConfig/dbConfig";
 import { verifyToken } from "@/lib/auth";
 
-/**
- * Fetch full user details including role, course, and year.
- */
 async function getFullUser(userId: number) {
   const [users]: any = await pool.query(
     `SELECT 
@@ -15,105 +12,79 @@ async function getFullUser(userId: number) {
      WHERE u.id = ? LIMIT 1`,
     [userId]
   );
+  console.log("🔹 getFullUser result:", users);
   return users.length ? users[0] : null;
 }
 
-// ----------------------------------------------------------------------
-// --- GET (Fetch Notifications Per User or Sent Ones) ---
-// ----------------------------------------------------------------------
+/* -------------------- GET: Fetch Notifications -------------------- */
 export async function GET(request: NextRequest) {
   const { valid, user, response } = verifyToken(request);
   if (!valid) return response;
 
   const { searchParams } = new URL(request.url);
-  const type = searchParams.get("type") || "system"; // "system" | "sent"
+  const type = searchParams.get("type") || "system";
 
   const fullUser = await getFullUser((user as any).id);
   if (!fullUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  console.log(`🔹 GET notifications for user ${fullUser.id} (${fullUser.role}), type: ${type}`);
 
   try {
     let query = "";
     let params: any[] = [];
 
-    // ------------------------------------------------------------------
-    // SYSTEM NOTIFICATIONS — ones RECEIVED by the logged-in user
-    // ------------------------------------------------------------------
     if (type === "system") {
       if (fullUser.role === "STUDENT") {
         query = `
           SELECT 
-            n.id,
-            n.title,
+            n.id, n.title,
             COALESCE(n.detail, n.message) AS message,
-            n.unit,
-            n.venue,
-            n.classTime,
-            n.createdAt,
+            n.unitCode, n.venue, n.classTime, n.createdAt,
             u.firstname AS lecturer,
-            un.readStatus,
-            un.deleted
+            nu.readStatus, nu.deleted
           FROM notification n
-          LEFT JOIN user_notification un ON n.id = un.notificationId AND un.userId = ?
+          LEFT JOIN notification_user nu ON n.id = nu.notificationId AND nu.userId = ?
           LEFT JOIN users u ON u.id = n.senderId
-          WHERE 
-            (
+          WHERE (
               (n.targetType = 'USER' AND n.targetUserId = ?)
               OR (n.targetType = 'COURSE' AND n.targetCourse = ? AND (n.targetYear = ? OR n.targetYear IS NULL))
               OR n.targetType = 'ALL_STUDENTS'
             )
-            AND (un.deleted IS NULL OR un.deleted = 0)
+            AND (nu.deleted IS NULL OR nu.deleted = 0)
           ORDER BY n.createdAt DESC
         `;
         params = [fullUser.id, fullUser.id, fullUser.course, fullUser.yearOfStudy];
       } else if (fullUser.role === "LECTURER") {
         query = `
           SELECT 
-            n.id, 
-            n.title, 
-            COALESCE(n.detail, n.message) AS message,
-            n.createdAt, 
-            n.senderId, 
-            un.readStatus
+            n.id, n.title, COALESCE(n.detail, n.message) AS message,
+            n.createdAt, n.senderId, nu.readStatus
           FROM notification n
-          LEFT JOIN user_notification un ON n.id = un.notificationId AND un.userId = ?
-          WHERE 
-            (n.targetType = 'ALL_LECTURERS' OR (n.targetType = 'USER' AND n.targetUserId = ?))
-            AND (un.deleted IS NULL OR un.deleted = 0)
+          LEFT JOIN notification_user nu ON n.id = nu.notificationId AND nu.userId = ?
+          WHERE (n.targetType = 'ALL_LECTURERS' OR (n.targetType = 'USER' AND n.targetUserId = ?))
+            AND (nu.deleted IS NULL OR nu.deleted = 0)
           ORDER BY n.createdAt DESC
         `;
         params = [fullUser.id, fullUser.id];
       } else if (fullUser.role === "ADMIN") {
         query = `
           SELECT 
-            n.id,
-            n.title,
+            n.id, n.title,
             COALESCE(n.detail, n.message) AS message,
-            n.createdAt,
-            un.readStatus
+            n.createdAt, nu.readStatus
           FROM notification n
-          LEFT JOIN user_notification un ON n.id = un.notificationId AND un.userId = ?
-          WHERE 
-            (n.targetType = 'ADMIN' OR n.targetType = 'ALL_ADMINS')
-            AND (un.deleted IS NULL OR un.deleted = 0)
+          LEFT JOIN notification_user nu ON n.id = nu.notificationId AND nu.userId = ?
+          WHERE (n.targetType = 'ADMIN' OR n.targetType = 'ALL_ADMINS')
+            AND (nu.deleted IS NULL OR nu.deleted = 0)
           ORDER BY n.createdAt DESC
         `;
         params = [fullUser.id];
       }
-    }
-
-    // ------------------------------------------------------------------
-    // SENT NOTIFICATIONS — ones AUTHORED by the logged-in user
-    // ------------------------------------------------------------------
-    else if (type === "sent") {
+    } else if (type === "sent") {
       query = `
         SELECT 
-          n.id,
-          n.title,
-          n.message,
-          n.targetType,
-          n.targetCourse,
-          n.targetYear,
-          n.createdAt
+          n.id, n.title, n.message, n.targetType,
+          n.targetCourse, n.targetYear, n.createdAt
         FROM notification n
         WHERE n.senderId = ?
         ORDER BY n.createdAt DESC
@@ -122,6 +93,7 @@ export async function GET(request: NextRequest) {
     }
 
     const [rows]: any = await pool.query(query, params);
+    console.log(`🔹 Fetched ${rows.length} notifications for user ${fullUser.id}`);
     return NextResponse.json(rows);
   } catch (err: any) {
     console.error("❌ GET Error:", err.message);
@@ -129,9 +101,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ----------------------------------------------------------------------
-// --- POST (Create Notification + Initialize User Records) ---
-// ----------------------------------------------------------------------
+/* -------------------- POST: Send Notification -------------------- */
 export async function POST(request: NextRequest) {
   const { valid, user, response } = verifyToken(request);
   if (!valid) return response;
@@ -142,21 +112,11 @@ export async function POST(request: NextRequest) {
   if (fullUser.role === "STUDENT")
     return NextResponse.json({ error: "Students cannot send notifications" }, { status: 403 });
 
+  console.log(`🔹 Sending notification as user ${fullUser.id} (${fullUser.role})`);
+
   try {
     const body = await request.json();
-    const {
-      title,
-      message,
-      targetType,
-      targetCourse,
-      targetYear,
-      targetRegNo,
-      targetEmail,
-      venue,
-      unit,
-      detail,
-      classTime,
-    } = body;
+    const { title, message, targetType, targetCourse, targetYear, targetRegNo, targetEmail, venue, unit, detail, classTime } = body;
 
     if (!title || !message || !targetType)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -165,84 +125,65 @@ export async function POST(request: NextRequest) {
     let finalTargetCourse = targetCourse || null;
     let finalTargetYear = targetYear || null;
 
-    // Target a single student
     if (targetType === "USER" && targetRegNo) {
-      const [studentResult]: any = await pool.query(
+      const [student]: any = await pool.query(
         "SELECT id FROM student WHERE registrationNumber = ? LIMIT 1",
         [targetRegNo]
       );
-      if (!studentResult.length)
+      if (!student.length)
         return NextResponse.json({ error: `Student ${targetRegNo} not found.` }, { status: 404 });
-      targetUserId = studentResult[0].id;
-    }
-
-    // Target a single admin
-    else if (targetType === "ADMIN" && targetEmail) {
-      const [adminResult]: any = await pool.query(
+      targetUserId = student[0].id;
+      console.log(`🔹 Targeting USER ${targetUserId}`);
+    } else if (targetType === "ADMIN" && targetEmail) {
+      const [admin]: any = await pool.query(
         "SELECT id FROM users WHERE email = ? AND role = 'ADMIN' LIMIT 1",
         [targetEmail]
       );
-      if (!adminResult.length)
+      if (!admin.length)
         return NextResponse.json({ error: `Admin ${targetEmail} not found.` }, { status: 404 });
-      targetUserId = adminResult[0].id;
+      targetUserId = admin[0].id;
+      console.log(`🔹 Targeting ADMIN ${targetUserId}`);
     }
 
-    // Always ensure detail exists
     const finalDetail = detail || message;
 
-    // Insert notification
     const [insertResult]: any = await pool.query(
       `INSERT INTO notification 
-        (senderId, title, message, targetType, targetUserId, targetCourse, targetYear, 
-         venue, unit, detail, classTime, readStatus) 
+       (senderId, title, message, targetType, targetUserId, targetCourse, targetYear,
+        venue, unitCode, detail, classTime, readStatus)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-      [
-        senderId,
-        title,
-        message,
-        targetType,
-        targetUserId,
-        finalTargetCourse,
-        finalTargetYear,
-        venue || null,
-        unit || null,
-        finalDetail,
-        classTime || null,
-      ]
+      [senderId, title, message, targetType, targetUserId, finalTargetCourse, finalTargetYear, venue || null, unit || null, finalDetail, classTime || null]
     );
 
     const notificationId = insertResult.insertId;
+    console.log(`🔹 Notification created with ID ${notificationId}`);
 
-    // Initialize user_notification for each targeted user
+    // Link notification to users
+    let linkedCount = 0;
     if (targetType === "COURSE" && finalTargetCourse) {
       const [students]: any = await pool.query(
         "SELECT id FROM student WHERE course = ? AND (yearOfStudy = ? OR ? IS NULL)",
         [finalTargetCourse, finalTargetYear, finalTargetYear]
       );
-      if (students.length) {
-        const values = students.map((s: any) => [notificationId, s.id]);
-        await pool.query(
-          "INSERT INTO user_notification (notificationId, userId) VALUES ?",
-          [values]
-        );
+      const values = students.map((s: any) => [notificationId, s.id]);
+      if (values.length) {
+        const [res]: any = await pool.query("INSERT INTO notification_user (notificationId, userId) VALUES ?", [values]);
+        linkedCount = res.affectedRows || values.length;
       }
     } else if (targetType === "ALL_STUDENTS") {
-      const [allStudents]: any = await pool.query("SELECT id FROM student");
-      if (allStudents.length) {
-        const values = allStudents.map((s: any) => [notificationId, s.id]);
-        await pool.query(
-          "INSERT INTO user_notification (notificationId, userId) VALUES ?",
-          [values]
-        );
+      const [students]: any = await pool.query("SELECT id FROM student");
+      const values = students.map((s: any) => [notificationId, s.id]);
+      if (values.length) {
+        const [res]: any = await pool.query("INSERT INTO notification_user (notificationId, userId) VALUES ?", [values]);
+        linkedCount = res.affectedRows || values.length;
       }
     } else if (targetType === "USER" && targetUserId) {
-      await pool.query(
-        "INSERT INTO user_notification (notificationId, userId) VALUES (?, ?)",
-        [notificationId, targetUserId]
-      );
+      const [res]: any = await pool.query("INSERT INTO notification_user (notificationId, userId) VALUES (?, ?)", [notificationId, targetUserId]);
+      linkedCount = res.affectedRows || 1;
     }
 
-    return NextResponse.json({ message: "Notification sent successfully" });
+    console.log(`🔹 Notification linked to ${linkedCount} users`);
+    return NextResponse.json({ success: true, message: "Notification sent successfully", notificationId, linkedCount });
   } catch (err: any) {
     console.error("❌ POST Error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

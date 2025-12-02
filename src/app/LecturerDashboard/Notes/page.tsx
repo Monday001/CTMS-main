@@ -1,18 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { FaPaperclip, FaEye, FaEyeSlash, FaDownload, FaUpload } from "react-icons/fa";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { usePageTitle } from "../layout";
+import axios from "axios";
 
 interface NoteItem {
   id: string;
   title: string;
-  filename?: string;
-  unitCode?: string;
-  uploadedAt?: string;
-  visibleToStudents?: boolean;
+  unitCode: string;
+  filePath: string;
+  uploadedAt: string;
+  visibleToStudents: number;
 }
 
 const LecturerNotes = () => {
@@ -22,61 +24,108 @@ const LecturerNotes = () => {
   const [unitCode, setUnitCode] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [visible, setVisible] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const searchParams = useSearchParams();
+  const queryUnitCode = searchParams.get("unitCode");
+
+  /* -------------------------------------------------------------------------- */
+  /*                            Fetch Notes from API                            */
+  /* -------------------------------------------------------------------------- */
+  const fetchNotes = async () => {
+    try {
+      const url = queryUnitCode
+        ? `/api/users/lecturer/notes?unitCode=${queryUnitCode}`
+        : `/api/users/lecturer/notes`;
+
+      const res = await axios.get(url);
+      if (res.data.success) {
+        setNotes(res.data.notes);
+      } else {
+        toast.error("Failed to fetch notes");
+      }
+    } catch (err: any) {
+      console.error("Fetch notes error:", err);
+      toast.error("Could not load notes");
+    }
+  };
 
   useEffect(() => {
     setTitle("Notes & Materials");
+    if (queryUnitCode) setUnitCode(queryUnitCode);
+    fetchNotes();
+  }, [setTitle, queryUnitCode]);
 
-    // Dummy data
-    const dummyNotes: NoteItem[] = [
-      {
-        id: "n1",
-        title: "Week 1 Lecture Notes",
-        filename: "intro_programming.pdf",
-        unitCode: "CSC101",
-        uploadedAt: new Date().toISOString(),
-        visibleToStudents: true,
-      },
-      {
-        id: "n2",
-        title: "Assignment 1",
-        filename: "assignment1.docx",
-        unitCode: "CSC204",
-        uploadedAt: new Date().toISOString(),
-        visibleToStudents: false,
-      },
-    ];
-    setNotes(dummyNotes);
-  }, [setTitle]);
-
-  const handleUpload = () => {
+  /* -------------------------------------------------------------------------- */
+  /*                            Upload Notes to Server                          */
+  /* -------------------------------------------------------------------------- */
+  const handleUpload = async () => {
     if (!title || !unitCode || !file)
       return toast.error("Please fill in title, unit, and select a file");
 
-    const newNote: NoteItem = {
-      id: String(Date.now()),
-      title,
-      filename: file.name,
-      unitCode,
-      uploadedAt: new Date().toISOString(),
-      visibleToStudents: visible,
-    };
-    setNotes((prev) => [newNote, ...prev]);
-    setNoteTitle("");
-    setUnitCode("");
-    setFile(null);
-    toast.success("Note uploaded (mock)");
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("file", file);
+
+      const res = await axios.post(
+        `/api/users/lecturer/notes?unitCode=${unitCode}`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      if (res.data.success) {
+        toast.success("Note uploaded successfully");
+        fetchNotes();
+        setNoteTitle("");
+        if (!queryUnitCode) setUnitCode("");
+        setFile(null);
+      } else {
+        toast.error(res.data.error || "Upload failed");
+      }
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      toast.error("Error uploading note");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const toggleVisibility = (id: string) => {
-    setNotes((prev) =>
-      prev.map((n) =>
-        n.id === id
-          ? { ...n, visibleToStudents: !n.visibleToStudents }
-          : n
-      )
-    );
+  /* -------------------------------------------------------------------------- */
+  /*                          Toggle Note Visibility                            */
+  /* -------------------------------------------------------------------------- */
+  const toggleVisibility = async (id: string, currentVisible: number) => {
+    try {
+      const newVisible = currentVisible === 1 ? 0 : 1;
+
+      const res = await axios.patch(`/api/users/lecturer/notes`, {
+        noteId: id,
+        visible: newVisible,
+      });
+
+      if (res.data.success) {
+        toast.success(
+          newVisible ? "Note is now visible to students" : "Note hidden from students"
+        );
+
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.id === id ? { ...n, visible_to_students: newVisible } : n
+          )
+        );
+      } else {
+        toast.error("Failed to update visibility");
+      }
+    } catch (err: any) {
+      console.error("Toggle error:", err);
+      toast.error("Could not toggle visibility");
+    }
   };
 
+  /* -------------------------------------------------------------------------- */
+  /*                                   Render                                   */
+  /* -------------------------------------------------------------------------- */
   return (
     <div className="p-6">
       <p className="text-sm text-gray-600 mb-6">
@@ -97,6 +146,7 @@ const LecturerNotes = () => {
             onChange={(e) => setUnitCode(e.target.value)}
             placeholder="Unit code (e.g. CSC201)"
             className="p-2 border rounded"
+            disabled={!!queryUnitCode}
           />
           <input
             type="file"
@@ -116,9 +166,12 @@ const LecturerNotes = () => {
           </label>
           <button
             onClick={handleUpload}
-            className="px-4 py-2 rounded bg-[#50765F] text-white"
+            disabled={loading}
+            className={`px-4 py-2 rounded text-white flex items-center gap-2 ${
+              loading ? "bg-gray-400" : "bg-[#50765F] hover:bg-[#406250]"
+            }`}
           >
-            <FaUpload className="inline mr-1" /> Upload
+            <FaUpload /> {loading ? "Uploading..." : "Upload"}
           </button>
         </div>
       </div>
@@ -130,6 +183,12 @@ const LecturerNotes = () => {
         transition={{ duration: 0.4 }}
         className="space-y-3"
       >
+        {notes.length === 0 && (
+          <p className="text-sm text-gray-500 italic text-center">
+            No notes uploaded yet.
+          </p>
+        )}
+
         {notes.map((n) => (
           <div
             key={n.id}
@@ -140,15 +199,15 @@ const LecturerNotes = () => {
               <div>
                 <div className="font-semibold text-gray-800">{n.title}</div>
                 <div className="text-xs text-gray-500">
-                  {n.unitCode} • {n.filename} •{" "}
-                  {new Date(n.uploadedAt || "").toLocaleDateString()}
+                  {n.unitCode} • {n.filePath?.split("/").pop()} •{" "}
+                  {new Date(n.uploadedAt).toLocaleDateString()}
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => toggleVisibility(n.id)}
+                onClick={() => toggleVisibility(n.id, n.visibleToStudents)}
                 className={`px-3 py-1 rounded text-sm flex items-center gap-2 ${
                   n.visibleToStudents
                     ? "bg-green-100 text-green-700"
@@ -158,12 +217,13 @@ const LecturerNotes = () => {
                 {n.visibleToStudents ? <FaEye /> : <FaEyeSlash />}
                 {n.visibleToStudents ? "Visible" : "Hidden"}
               </button>
-              <button
-                onClick={() => toast("Download mock")}
-                className="px-3 py-1 rounded border text-sm flex items-center gap-2"
+              <a
+                href={n.filePath}
+                download
+                className="px-3 py-1 rounded border text-sm flex items-center gap-2 hover:bg-gray-50"
               >
                 <FaDownload /> Download
-              </button>
+              </a>
             </div>
           </div>
         ))}

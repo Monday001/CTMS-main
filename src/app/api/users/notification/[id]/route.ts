@@ -13,9 +13,7 @@ async function getFullUser(userId: number) {
   return users.length ? users[0] : null;
 }
 
-// ----------------------------------------------------------------------
-// PATCH: Mark single notification as read for this user only
-// ----------------------------------------------------------------------
+/* -------------------- PATCH: Mark Notification as Read -------------------- */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -29,19 +27,17 @@ export async function PATCH(
 
   try {
     await pool.query(
-      `UPDATE user_notification SET readStatus = 1 WHERE notificationId = ? AND userId = ?`,
+      `UPDATE notification_user SET readStatus = 1 WHERE notificationId = ? AND userId = ?`,
       [notificationId, fullUser.id]
     );
-    return NextResponse.json({ message: "Marked as read" });
+    return NextResponse.json({ success: true, message: "Marked as read" });
   } catch (err: any) {
     console.error("❌ PATCH Read Error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
-// ----------------------------------------------------------------------
-// DELETE: Soft delete for student or actual delete for sender
-// ----------------------------------------------------------------------
+/* -------------------- DELETE: Soft Delete (Student) / Hard Delete (Admin) -------------------- */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -57,13 +53,13 @@ export async function DELETE(
   try {
     if (fullUser.role === "STUDENT") {
       await pool.query(
-        `UPDATE user_notification SET deleted = 1 WHERE notificationId = ? AND userId = ?`,
+        `UPDATE notification_user SET deleted = 1 WHERE notificationId = ? AND userId = ?`,
         [notificationId, fullUser.id]
       );
-      return NextResponse.json({ message: "Notification hidden for student" });
+      return NextResponse.json({ success: true, message: "Notification hidden for student" });
     } else {
       await pool.query("DELETE FROM notification WHERE id = ?", [notificationId]);
-      return NextResponse.json({ message: "Notification deleted successfully" });
+      return NextResponse.json({ success: true, message: "Notification deleted successfully" });
     }
   } catch (err: any) {
     console.error("❌ DELETE Error:", err.message);
